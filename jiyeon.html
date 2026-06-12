@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>스크래치 공개</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a1a;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      user-select: none;
+    }
+
+    .frame {
+      position: relative;
+      width: 600px;
+      height: 800px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .frame img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .frame canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame" id="frame">
+    <img src="youn.png" alt="youn" width="600" height="800">
+    <canvas id="overlay" width="600" height="800"></canvas>
+  </div>
+
+  
+  <script>
+    const frame = document.getElementById("frame");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+
+    const WIDTH = 600;
+    const HEIGHT = 800;
+    const BRUSH_SIZE = 40;
+    const HINT_TEXT = "손가락으로 문질러 이미지를 확인하세요";
+
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function wrapText(text, maxWidth) {
+      const lines = [];
+      let line = "";
+
+      for (const char of text) {
+        const test = line + char;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = char;
+        } else {
+          line = test;
+        }
+      }
+
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function drawHintText() {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#ffffff";
+      ctx.font = '500 20px "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      const maxWidth = WIDTH - 48;
+      const lineHeight = 30;
+      const lines = wrapText(HINT_TEXT, maxWidth);
+      const startY = HEIGHT / 2 - ((lines.length - 1) * lineHeight) / 2;
+
+      lines.forEach((line, index) => {
+        ctx.fillText(line, WIDTH / 2, startY + index * lineHeight);
+      });
+    }
+
+    function fillOverlay() {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      drawHintText();
+    }
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = WIDTH / rect.width;
+      const scaleY = HEIGHT / rect.height;
+
+      if (e.touches && e.touches.length > 0) {
+        return {
+          x: (e.touches[0].clientX - rect.left) * scaleX,
+          y: (e.touches[0].clientY - rect.top) * scaleY,
+        };
+      }
+
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    }
+
+    function scratch(x, y) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      ctx.arc(x, y, BRUSH_SIZE, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function scratchLine(x0, y0, x1, y1) {
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      const steps = Math.max(1, Math.ceil(dist / (BRUSH_SIZE * 0.4)));
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        scratch(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+      }
+    }
+
+    function startDraw(e) {
+      isDrawing = true;
+      const { x, y } = getPos(e);
+      lastX = x;
+      lastY = y;
+      scratch(x, y);
+      e.preventDefault();
+    }
+
+    function moveDraw(e) {
+      if (!isDrawing) return;
+      const { x, y } = getPos(e);
+      scratchLine(lastX, lastY, x, y);
+      lastX = x;
+      lastY = y;
+      e.preventDefault();
+    }
+
+    function endDraw() {
+      isDrawing = false;
+    }
+
+    fillOverlay();
+
+    canvas.addEventListener("mousedown", startDraw);
+    canvas.addEventListener("mousemove", moveDraw);
+    window.addEventListener("mouseup", endDraw);
+
+    canvas.addEventListener("touchstart", startDraw, { passive: false });
+    canvas.addEventListener("touchmove", moveDraw, { passive: false });
+    canvas.addEventListener("touchend", endDraw);
+    canvas.addEventListener("touchcancel", endDraw);
+
+    frame.addEventListener("mouseleave", endDraw);
+  </script>
+</body>
+</html>
